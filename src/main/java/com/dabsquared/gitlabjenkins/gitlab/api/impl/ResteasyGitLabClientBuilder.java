@@ -1,6 +1,7 @@
 package com.dabsquared.gitlabjenkins.gitlab.api.impl;
 
 
+import com.dabsquared.gitlabjenkins.connection.GitLabConnection;
 import com.dabsquared.gitlabjenkins.gitlab.JacksonConfig;
 import com.dabsquared.gitlabjenkins.gitlab.api.GitLabClient;
 import com.dabsquared.gitlabjenkins.gitlab.api.GitLabClientBuilder;
@@ -10,6 +11,7 @@ import com.dabsquared.gitlabjenkins.util.LoggerUtil;
 import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
+import com.google.common.base.Splitter;
 import com.google.common.collect.FluentIterable;
 import hudson.ProxyConfiguration;
 import hudson.init.InitMilestone;
@@ -21,9 +23,6 @@ import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.impl.client.BasicCredentialsProvider;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.jboss.resteasy.client.jaxrs.ClientHttpEngine;
-import org.jboss.resteasy.client.jaxrs.engines.ApacheHttpClient4Engine;
 import org.jboss.resteasy.plugins.providers.JaxrsFormProvider;
 import org.jboss.resteasy.spi.ResteasyProviderFactory;
 import org.kohsuke.accmod.Restricted;
@@ -47,6 +46,7 @@ import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.Proxy;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -77,54 +77,55 @@ public class ResteasyGitLabClientBuilder extends GitLabClientBuilder {
 
     @Nonnull
     @Override
-    public final GitLabClient buildClient(String url, String apiToken, boolean ignoreCertificateErrors, int connectionTimeout, int readTimeout) {
-        return buildClient(
-            url,
-            apiToken,
-            Jenkins.getActiveInstance().proxy,
-            ignoreCertificateErrors,
-            connectionTimeout,
-            readTimeout
-        );
+    public final GitLabClient buildClient(GitLabConnection connection, String token) {
+        return buildClient(connection, token, Jenkins.getActiveInstance().proxy);
     }
 
-    private GitLabClient buildClient(String url, String apiToken, ProxyConfiguration httpProxyConfig, boolean ignoreCertificateErrors, int connectionTimeout, int readTimeout) {
-        ResteasyClientBuilder builder = new ResteasyClientBuilder();
+    private GitLabClient buildClient(GitLabConnection connection, String token, ProxyConfiguration httpProxyConfig) {
+        ResteasyClientBuilder builder = new ResteasyClientBuilder()
+            .setRetryCount(connection.getRetryCount())
+            .setRetryInterval(connection.getRetryInterval())
+            .addRetryStatusCodes(parseStatusCodes(connection.getRetryStatusCodes()));
 
-        if (ignoreCertificateErrors) {
+        if (connection.isIgnoreCertificateErrors()) {
             builder.hostnameVerification(ResteasyClientBuilder.HostnameVerificationPolicy.ANY);
             builder.disableTrustManager();
         }
 
         if (httpProxyConfig != null) {
-            Proxy proxy = httpProxyConfig.createProxy(getHost(url));
+            Proxy proxy = httpProxyConfig.createProxy(getHost(connection.getUrl()));
             if (proxy.type() == HTTP) {
                 InetSocketAddress address = (InetSocketAddress) proxy.address();
-                builder.defaultProxy(address.getHostString().replaceFirst("^.*://", ""),
+                String hostname = address.getHostString().replaceFirst("^.*://", "");
+                builder.defaultProxy(hostname,
                     address.getPort(),
-                    address.getHostName().startsWith("https") ? "https" : "http",
-                    httpProxyConfig.getUserName(),
-                    httpProxyConfig.getPassword());
+                    address.getHostName().startsWith("https") ? "https" : "http");
+                if (httpProxyConfig.getUserName() != null && httpProxyConfig.getPassword() != null) {
+                    CredentialsProvider proxyCredentials = new BasicCredentialsProvider();
+                    proxyCredentials.setCredentials(new AuthScope(hostname, address.getPort()),
+                        new UsernamePasswordCredentials(httpProxyConfig.getUserName(), httpProxyConfig.getPassword()));
+                    builder.setProxyCredentials(proxyCredentials);
+                }
             }
         }
 
         GitLabApiProxy apiProxy = builder
             .connectionPoolSize(60)
             .maxPooledPerRoute(30)
-            .establishConnectionTimeout(connectionTimeout, TimeUnit.SECONDS)
-            .socketTimeout(readTimeout, TimeUnit.SECONDS)
+            .establishConnectionTimeout(connection.getConnectionTimeout(), TimeUnit.SECONDS)
+            .socketTimeout(connection.getReadTimeout(), TimeUnit.SECONDS)
             .register(new JacksonJsonProvider())
             .register(new JacksonConfig())
-            .register(new ApiHeaderTokenFilter(apiToken))
+            .register(new ApiHeaderTokenFilter(token))
             .register(new LoggingFilter())
             .register(new RemoveAcceptEncodingFilter())
             .register(new JaxrsFormProvider())
-            .build().target(url)
+            .build().target(connection.getUrl())
             .proxyBuilder(apiProxyClass)
             .classloader(apiProxyClass.getClassLoader())
             .build();
 
-        return new ResteasyGitLabClient(url, apiProxy, mergeRequestIdProvider);
+        return new ResteasyGitLabClient(connection.getUrl(), apiProxy, mergeRequestIdProvider);
     }
 
     private String getHost(String url) {
@@ -134,6 +135,18 @@ public class ResteasyGitLabClientBuilder extends GitLabClientBuilder {
             return null;
         }
     }
+
+    private static List<Integer> parseStatusCodes(String statusCodes) {
+        List<Integer> result = new ArrayList<>();
+        if (statusCodes == null) {
+            return result;
+        }
+        for (String part : Splitter.on(",").omitEmptyStrings().trimResults().split(statusCodes)) {
+            result.add(Integer.parseInt(part));
+        }
+        return result;
+    }
+
 
     @Priority(Priorities.HEADER_DECORATOR)
     private static class ApiHeaderTokenFilter implements ClientRequestFilter {
@@ -229,27 +242,4 @@ public class ResteasyGitLabClientBuilder extends GitLabClientBuilder {
         }
     }
 
-    private static class ResteasyClientBuilder extends org.jboss.resteasy.client.jaxrs.ResteasyClientBuilder {
-        private CredentialsProvider proxyCredentials;
-
-        @SuppressWarnings("UnusedReturnValue")
-        ResteasyClientBuilder defaultProxy(String hostname, int port, final String scheme, String username, String password) {
-            super.defaultProxy(hostname, port, scheme);
-            if (username != null && password != null) {
-                proxyCredentials = new BasicCredentialsProvider();
-                proxyCredentials.setCredentials(new AuthScope(hostname, port), new UsernamePasswordCredentials(username, password));
-            }
-            return this;
-        }
-
-        @SuppressWarnings("deprecation")
-        @Override
-        protected ClientHttpEngine initDefaultEngine() {
-            ApacheHttpClient4Engine httpEngine = (ApacheHttpClient4Engine) super.initDefaultEngine();
-            if (proxyCredentials != null) {
-                ((DefaultHttpClient) httpEngine.getHttpClient()).setCredentialsProvider(proxyCredentials);
-            }
-            return httpEngine;
-        }
-    }
 }

@@ -1,9 +1,10 @@
 package com.dabsquared.gitlabjenkins;
 
 
-import com.dabsquared.gitlabjenkins.connection.GitLabConnection;
+import com.dabsquared.gitlabjenkins.connection.GitLabConnectionBuilder;
 import com.dabsquared.gitlabjenkins.connection.GitLabConnectionConfig;
 import com.dabsquared.gitlabjenkins.connection.GitLabConnectionProperty;
+import com.dabsquared.gitlabjenkins.gitlab.api.GitLabClientBuilder;
 import com.dabsquared.gitlabjenkins.gitlab.hook.model.MergeRequestHook;
 import com.dabsquared.gitlabjenkins.gitlab.hook.model.NoteHook;
 import com.dabsquared.gitlabjenkins.gitlab.hook.model.PipelineHook;
@@ -14,12 +15,7 @@ import com.dabsquared.gitlabjenkins.publisher.GitLabMessagePublisher;
 import com.dabsquared.gitlabjenkins.publisher.GitLabVotePublisher;
 import com.dabsquared.gitlabjenkins.trigger.TriggerOpenMergeRequest;
 import com.dabsquared.gitlabjenkins.trigger.branch.ProjectBranchesProvider;
-import com.dabsquared.gitlabjenkins.trigger.filter.BranchFilter;
-import com.dabsquared.gitlabjenkins.trigger.filter.BranchFilterFactory;
-import com.dabsquared.gitlabjenkins.trigger.filter.BranchFilterType;
-import com.dabsquared.gitlabjenkins.trigger.filter.MergeRequestLabelFilter;
-import com.dabsquared.gitlabjenkins.trigger.filter.MergeRequestLabelFilterConfig;
-import com.dabsquared.gitlabjenkins.trigger.filter.MergeRequestLabelFilterFactory;
+import com.dabsquared.gitlabjenkins.trigger.filter.*;
 import com.dabsquared.gitlabjenkins.trigger.handler.merge.MergeRequestHookTriggerHandler;
 import com.dabsquared.gitlabjenkins.trigger.handler.note.NoteHookTriggerHandler;
 import com.dabsquared.gitlabjenkins.trigger.handler.pipeline.PipelineHookTriggerHandler;
@@ -48,14 +44,7 @@ import net.karneim.pojobuilder.GeneratePojoBuilder;
 import net.sf.json.JSONObject;
 import org.apache.commons.lang.StringUtils;
 import org.jenkinsci.Symbol;
-import org.kohsuke.stapler.Ancestor;
-import org.kohsuke.stapler.AncestorInPath;
-import org.kohsuke.stapler.DataBoundConstructor;
-import org.kohsuke.stapler.DataBoundSetter;
-import org.kohsuke.stapler.QueryParameter;
-import org.kohsuke.stapler.Stapler;
-import org.kohsuke.stapler.StaplerRequest;
-import org.kohsuke.stapler.StaplerResponse;
+import org.kohsuke.stapler.*;
 
 import java.io.IOException;
 import java.io.ObjectStreamException;
@@ -118,8 +107,8 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> implements MergeReques
     @Deprecated
     @GeneratePojoBuilder(intoPackage = "*.builder.generated", withFactoryMethod = "*")
     public GitLabPushTrigger(boolean triggerOnPush, boolean triggerOnMergeRequest, boolean triggerOnAcceptedMergeRequest, boolean triggerOnClosedMergeRequest,
-    						 TriggerOpenMergeRequest triggerOpenMergeRequestOnPush, boolean triggerOnNoteRequest, String noteRegex,
-    						 boolean skipWorkInProgressMergeRequest, boolean ciSkip,
+                             TriggerOpenMergeRequest triggerOpenMergeRequestOnPush, boolean triggerOnNoteRequest, String noteRegex,
+                             boolean skipWorkInProgressMergeRequest, boolean ciSkip,
                              boolean setBuildDescription, boolean addNoteOnMergeRequest, boolean addCiMessage, boolean addVoteOnMergeRequest,
                              boolean acceptMergeRequestOnSuccess, BranchFilterType branchFilterType,
                              String includeBranchesSpec, String excludeBranchesSpec, String sourceBranchRegex, String targetBranchRegex,
@@ -157,22 +146,22 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> implements MergeReques
     }
 
     @DataBoundConstructor
-    public GitLabPushTrigger() { }
+    public GitLabPushTrigger() {
+    }
 
     @Initializer(after = InitMilestone.JOB_LOADED)
     public static void migrateJobs() throws IOException {
         GitLabPushTrigger.DescriptorImpl oldConfig = Trigger.all().get(GitLabPushTrigger.DescriptorImpl.class);
         if (!oldConfig.jobsMigrated) {
             GitLabConnectionConfig gitLabConfig = (GitLabConnectionConfig) Jenkins.getInstance().getDescriptor(GitLabConnectionConfig.class);
-            gitLabConfig.getConnections().add(new GitLabConnection(
-                oldConfig.gitlabHostUrl,
-                    oldConfig.gitlabHostUrl,
-                    oldConfig.gitlabApiToken,
-                "autodetect",
-                    oldConfig.ignoreCertificateErrors,
-                    10,
-                    10));
-
+            gitLabConfig.getConnections().add(
+                GitLabConnectionBuilder.gitLabConnection()
+                    .withUrl(oldConfig.gitlabHostUrl)
+                    .withName(oldConfig.gitlabHostUrl)
+                    .withClientBuilder(GitLabClientBuilder.getAutodetectBuilder())
+                    .withIgnoreCertificateErrors(oldConfig.ignoreCertificateErrors)
+                    .withApiTokenId(oldConfig.gitlabApiToken)
+                    .build());
             String defaultConnectionName = gitLabConfig.getConnections().get(0).getName();
             for (AbstractProject<?, ?> project : Jenkins.getInstance().getAllItems(AbstractProject.class)) {
                 GitLabPushTrigger trigger = project.getTrigger(GitLabPushTrigger.class);
@@ -225,9 +214,9 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> implements MergeReques
 
     @Override
     public boolean isTriggerOnApprovedMergeRequest() {
-		return triggerOnApprovedMergeRequest;
-	}    
-    
+        return triggerOnApprovedMergeRequest;
+    }
+
     @Override
     public boolean isTriggerOnClosedMergeRequest() {
         return triggerOnClosedMergeRequest;
@@ -237,7 +226,9 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> implements MergeReques
         return triggerOnNoteRequest;
     }
 
-    public boolean getTriggerOnPipelineEvent() { return triggerOnPipelineEvent; }
+    public boolean getTriggerOnPipelineEvent() {
+        return triggerOnPipelineEvent;
+    }
 
     public String getNoteRegex() {
         return this.noteRegex == null ? "" : this.noteRegex;
@@ -302,7 +293,7 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> implements MergeReques
     public void setTriggerOnPush(boolean triggerOnPush) {
         this.triggerOnPush = triggerOnPush;
     }
-    
+
     @DataBoundSetter
     public void setTriggerOnApprovedMergeRequest(boolean triggerOnApprovedMergeRequest) {
         this.triggerOnApprovedMergeRequest = triggerOnApprovedMergeRequest;
@@ -482,7 +473,7 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> implements MergeReques
     }
 
     private void initializeTriggerHandler() {
-		mergeRequestHookTriggerHandler = newMergeRequestHookTriggerHandler(this);
+        mergeRequestHookTriggerHandler = newMergeRequestHookTriggerHandler(this);
         noteHookTriggerHandler = newNoteHookTriggerHandler(triggerOnNoteRequest, noteRegex);
         pushHookTriggerHandler = newPushHookTriggerHandler(triggerOnPush, triggerOpenMergeRequestOnPush, skipWorkInProgressMergeRequest);
         pipelineTriggerHandler = newPipelineHookTriggerHandler(triggerOnPipelineEvent);
@@ -490,11 +481,11 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> implements MergeReques
 
     private void initializeBranchFilter() {
         branchFilter = BranchFilterFactory.newBranchFilter(branchFilterConfig()
-                .withIncludeBranchesSpec(includeBranchesSpec)
-                .withExcludeBranchesSpec(excludeBranchesSpec)
-                .withSourceBranchRegex(sourceBranchRegex)
-                .withTargetBranchRegex(targetBranchRegex)
-                .build(branchFilterType));
+            .withIncludeBranchesSpec(includeBranchesSpec)
+            .withExcludeBranchesSpec(excludeBranchesSpec)
+            .withSourceBranchRegex(sourceBranchRegex)
+            .withTargetBranchRegex(targetBranchRegex)
+            .build(branchFilterType));
     }
 
     private void initializeMergeRequestLabelFilter() {
@@ -543,8 +534,8 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> implements MergeReques
         @Override
         public boolean isApplicable(Item item) {
             return item instanceof Job
-                    && SCMTriggerItems.asSCMTriggerItem(item) != null
-                    && item instanceof ParameterizedJobMixIn.ParameterizedJob;
+                && SCMTriggerItems.asSCMTriggerItem(item) != null
+                && item instanceof ParameterizedJobMixIn.ParameterizedJob;
         }
 
         @Override
@@ -562,10 +553,10 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> implements MergeReques
 
         private StringBuilder retrieveProjectUrl(Job<?, ?> project) {
             return new StringBuilder()
-                    .append(Jenkins.getInstance().getRootUrl())
-                    .append(GitLabWebHook.WEBHOOK_URL)
-                    .append(retrieveParentUrl(project))
-                    .append('/').append(Util.rawEncode(project.getName()));
+                .append(Jenkins.getInstance().getRootUrl())
+                .append(GitLabWebHook.WEBHOOK_URL)
+                .append(retrieveParentUrl(project))
+                .append('/').append(Util.rawEncode(project.getName()));
         }
 
         private StringBuilder retrieveParentUrl(Item item) {
@@ -594,8 +585,8 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> implements MergeReques
 
         public ListBoxModel doFillTriggerOpenMergeRequestOnPushItems(@QueryParameter String triggerOpenMergeRequestOnPush) {
             return new ListBoxModel(new Option("Never", "never", triggerOpenMergeRequestOnPush.matches("never")),
-                    new Option("On push to source branch", "source", triggerOpenMergeRequestOnPush.matches("source")),
-                    new Option("On push to source or target branch", "both", triggerOpenMergeRequestOnPush.matches("both")));
+                new Option("On push to source branch", "source", triggerOpenMergeRequestOnPush.matches("source")),
+                new Option("On push to source or target branch", "both", triggerOpenMergeRequestOnPush.matches("both")));
         }
 
         public AutoCompletionCandidates doAutoCompleteIncludeBranchesSpec(@AncestorInPath final Job<?, ?> job, @QueryParameter final String value) {
@@ -637,8 +628,10 @@ public class GitLabPushTrigger extends Trigger<Job<?, ?>> implements MergeReques
             response.setHeader("script", "document.getElementById('secretToken').value='" + secretToken + "'");
         }
 
-        public void doClearSecretToken(@AncestorInPath final Job<?, ?> project, StaplerResponse response) {;
+        public void doClearSecretToken(@AncestorInPath final Job<?, ?> project, StaplerResponse response) {
             response.setHeader("script", "document.getElementById('secretToken').value=''");
         }
+
     }
+
 }

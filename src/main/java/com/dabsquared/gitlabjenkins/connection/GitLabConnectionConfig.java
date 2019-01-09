@@ -77,7 +77,7 @@ public class GitLabConnectionConfig extends GlobalConfiguration {
     public void setConnections(List<GitLabConnection> newConnections) {
         connections = new ArrayList<>();
         connectionMap = new HashMap<>();
-        for (GitLabConnection connection: newConnections){
+        for (GitLabConnection connection : newConnections) {
             addConnection(connection);
         }
     }
@@ -137,8 +137,29 @@ public class GitLabConnectionConfig extends GlobalConfiguration {
                                            @QueryParameter boolean ignoreCertificateErrors,
                                            @QueryParameter int connectionTimeout,
                                            @QueryParameter int readTimeout) {
+        return doTestConnection(url, apiTokenId, clientBuilderId, ignoreCertificateErrors, connectionTimeout, readTimeout, 0, null);
+    }
+
+    public FormValidation doTestConnection(String url,
+                                           String apiTokenId,
+                                           String clientBuilderId,
+                                           boolean ignoreCertificateErrors,
+                                           int connectionTimeout,
+                                           int readTimeout,
+                                           int retryCount,
+                                           String retryStatusCodes) {
         try {
-            new GitLabConnection("", url, apiTokenId, clientBuilderId, ignoreCertificateErrors, connectionTimeout, readTimeout).getClient().getCurrentUser();
+            GitLabConnectionBuilder.gitLabConnection()
+                .withName("")
+                .withUrl(url)
+                .withApiTokenId(apiTokenId)
+                .withClientBuilder(GitLabClientBuilder.getGitLabClientBuilderById(clientBuilderId))
+                .withIgnoreCertificateErrors(ignoreCertificateErrors)
+                .withConnectionTimeout(connectionTimeout)
+                .withReadTimeout(readTimeout)
+                .withRetryCount(retryCount)
+                .withRetryStatusCodes(retryStatusCodes)
+                .build().getClient().getCurrentUser();
             return FormValidation.ok(Messages.connection_success());
         } catch (WebApplicationException e) {
             return FormValidation.error(Messages.connection_error(e.getMessage()));
@@ -152,10 +173,10 @@ public class GitLabConnectionConfig extends GlobalConfiguration {
             AbstractIdCredentialsListBoxModel<StandardListBoxModel, StandardCredentials> options = new StandardListBoxModel()
                 .includeEmptyValue()
                 .includeMatchingAs(ACL.SYSTEM,
-                                   Jenkins.getActiveInstance(),
-                                   StandardCredentials.class,
-                                   URIRequirementBuilder.fromUri(url).build(),
-                                   new GitLabCredentialMatcher());
+                    Jenkins.getActiveInstance(),
+                    StandardCredentials.class,
+                    URIRequirementBuilder.fromUri(url).build(),
+                    new GitLabCredentialMatcher());
             if (name != null && connectionMap.containsKey(name)) {
                 String apiTokenId = connectionMap.get(name).getApiTokenId();
                 options.includeCurrentValue(apiTokenId);
@@ -187,6 +208,7 @@ public class GitLabConnectionConfig extends GlobalConfiguration {
     }
 
     private static class GitLabCredentialMatcher implements CredentialsMatcher {
+
         @Override
         public boolean matches(@NonNull Credentials credentials) {
             try {
@@ -195,7 +217,9 @@ public class GitLabConnectionConfig extends GlobalConfiguration {
                 return false;
             }
         }
+
     }
+
     //For backwards compatibility. ReadResolve is called on startup
     protected GitLabConnectionConfig readResolve() {
         if (useAuthenticatedEndpoint == null) {
@@ -203,4 +227,5 @@ public class GitLabConnectionConfig extends GlobalConfiguration {
         }
         return this;
     }
+
 }

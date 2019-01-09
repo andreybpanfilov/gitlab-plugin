@@ -1,6 +1,8 @@
 package com.dabsquared.gitlabjenkins.gitlab.api;
 
 
+import com.dabsquared.gitlabjenkins.connection.GitLabConnection;
+import com.dabsquared.gitlabjenkins.connection.GitLabConnectionBuilder;
 import hudson.ExtensionPoint;
 import jenkins.model.Jenkins;
 import org.kohsuke.accmod.Restricted;
@@ -16,6 +18,11 @@ import static java.util.Collections.sort;
 
 @Restricted(NoExternalUse.class)
 public abstract class GitLabClientBuilder implements Comparable<GitLabClientBuilder>, ExtensionPoint, Serializable {
+
+    public static GitLabClientBuilder getAutodetectBuilder() {
+        return getGitLabClientBuilderById("autodetect");
+    }
+
     public static GitLabClientBuilder getGitLabClientBuilderById(String id) {
         for (GitLabClientBuilder provider : getAllGitLabClientBuilders()) {
             if (provider.id().equals(id)) {
@@ -46,11 +53,25 @@ public abstract class GitLabClientBuilder implements Comparable<GitLabClientBuil
     }
 
     @Nonnull
-    public abstract GitLabClient buildClient(String url, String token, boolean ignoreCertificateErrors, int connectionTimeout, int readTimeout);
+    public GitLabClient buildClient(String url, String token, boolean ignoreCertificateErrors, int connectionTimeout, int readTimeout) {
+        return buildClient(
+            GitLabConnectionBuilder.gitLabConnection()
+                .withName("")
+                .withUrl(url)
+                .withClientBuilder(this)
+                .withIgnoreCertificateErrors(ignoreCertificateErrors)
+                .withConnectionTimeout(connectionTimeout)
+                .withReadTimeout(readTimeout).build()
+            , token);
+    }
+
+    @Nonnull
+    public abstract GitLabClient buildClient(GitLabConnection connection, String token);
 
     @Override
     public final int compareTo(@Nonnull GitLabClientBuilder other) {
         int o = ordinal - other.ordinal;
         return o != 0 ? o : id().compareTo(other.id());
     }
+
 }

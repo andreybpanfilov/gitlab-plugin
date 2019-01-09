@@ -1,6 +1,8 @@
 package com.dabsquared.gitlabjenkins.gitlab.api.impl;
 
 
+import com.dabsquared.gitlabjenkins.connection.GitLabConnection;
+import com.dabsquared.gitlabjenkins.connection.GitLabConnectionBuilder;
 import com.dabsquared.gitlabjenkins.gitlab.api.GitLabClient;
 import com.dabsquared.gitlabjenkins.gitlab.api.GitLabClientBuilder;
 import com.dabsquared.gitlabjenkins.gitlab.api.model.*;
@@ -12,27 +14,34 @@ import java.util.NoSuchElementException;
 
 
 final class AutodetectingGitLabClient implements GitLabClient {
+
     private final Iterable<GitLabClientBuilder> builders;
-    private final String url;
+    private final GitLabConnection connection;
     private final String token;
-    private final boolean ignoreCertificateErrors;
-    private final int connectionTimeout;
-    private final int readTimeout;
     private GitLabClient delegate;
 
-
     AutodetectingGitLabClient(Iterable<GitLabClientBuilder> builders, String url, String token, boolean ignoreCertificateErrors, int connectionTimeout, int readTimeout) {
+        this(builders,
+            GitLabConnectionBuilder.gitLabConnection()
+                .withName("")
+                .withUrl(url)
+                .withClientBuilder(GitLabClientBuilder.getAutodetectBuilder())
+                .withIgnoreCertificateErrors(ignoreCertificateErrors)
+                .withConnectionTimeout(connectionTimeout)
+                .withReadTimeout(readTimeout)
+                .build(),
+            token);
+    }
+
+    AutodetectingGitLabClient(Iterable<GitLabClientBuilder> builders, GitLabConnection connection, String token) {
         this.builders = builders;
-        this.url = url;
+        this.connection = connection;
         this.token = token;
-        this.ignoreCertificateErrors = ignoreCertificateErrors;
-        this.connectionTimeout = connectionTimeout;
-        this.readTimeout = readTimeout;
     }
 
     @Override
     public String getHostUrl() {
-        return url;
+        return connection.getUrl();
     }
 
     @Override
@@ -307,12 +316,12 @@ final class AutodetectingGitLabClient implements GitLabClient {
             return client;
         }
 
-        throw new NoSuchElementException("no client-builder found that supports server at " + url);
+        throw new NoSuchElementException("no client-builder found that supports server at " + connection.getUrl());
     }
 
     private GitLabClient autodetect() {
         for (GitLabClientBuilder candidate : builders) {
-            GitLabClient client = candidate.buildClient(url, token, ignoreCertificateErrors, connectionTimeout, readTimeout);
+            GitLabClient client = candidate.buildClient(connection, token);
             try {
                 client.getCurrentUser();
                 return client;
@@ -330,6 +339,7 @@ final class AutodetectingGitLabClient implements GitLabClient {
 
 
     private abstract class GitLabOperation<R> {
+
         private R execute(boolean reset) {
             try {
                 return execute(delegate(reset));
@@ -344,5 +354,7 @@ final class AutodetectingGitLabClient implements GitLabClient {
 
 
         abstract R execute(GitLabClient client);
+
     }
+
 }

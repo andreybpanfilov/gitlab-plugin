@@ -1,11 +1,7 @@
 package com.dabsquared.gitlabjenkins.connection;
 
 
-import com.cloudbees.plugins.credentials.CredentialsMatchers;
-import com.cloudbees.plugins.credentials.CredentialsProvider;
-import com.cloudbees.plugins.credentials.CredentialsScope;
-import com.cloudbees.plugins.credentials.CredentialsStore;
-import com.cloudbees.plugins.credentials.SystemCredentialsProvider;
+import com.cloudbees.plugins.credentials.*;
 import com.cloudbees.plugins.credentials.common.StandardCredentials;
 import com.cloudbees.plugins.credentials.domains.Domain;
 import com.cloudbees.plugins.credentials.domains.DomainRequirement;
@@ -18,6 +14,7 @@ import hudson.model.Item;
 import hudson.security.ACL;
 import hudson.util.Secret;
 import jenkins.model.Jenkins;
+import net.karneim.pojobuilder.GeneratePojoBuilder;
 import org.jenkinsci.plugins.plaincredentials.StringCredentials;
 import org.kohsuke.accmod.Restricted;
 import org.kohsuke.accmod.restrictions.NoExternalUse;
@@ -36,31 +33,23 @@ import static com.dabsquared.gitlabjenkins.gitlab.api.GitLabClientBuilder.getGit
  * @author Robin Müller
  */
 public class GitLabConnection {
+
     private final String name;
     private final String url;
     private transient String apiToken;
     // TODO make final when migration code gets removed
     private String apiTokenId;
-    private GitLabClientBuilder clientBuilder;
+    private transient GitLabClientBuilder clientBuilder;
     private final boolean ignoreCertificateErrors;
     private final Integer connectionTimeout;
     private final Integer readTimeout;
     private transient GitLabClient apiCache;
-
-    public GitLabConnection(String name, String url, String apiTokenId, boolean ignoreCertificateErrors, Integer connectionTimeout, Integer readTimeout) {
-        this(
-            name,
-            url,
-            apiTokenId,
-            new AutodetectGitLabClientBuilder(),
-            ignoreCertificateErrors,
-            connectionTimeout,
-            readTimeout
-        );
-    }
+    private final Integer retryInterval;
+    private final Integer retryCount;
+    private final String retryStatusCodes;
 
     @DataBoundConstructor
-    public GitLabConnection(String name, String url, String apiTokenId, String clientBuilderId, boolean ignoreCertificateErrors, Integer connectionTimeout, Integer readTimeout) {
+    public GitLabConnection(String name, String url, String apiTokenId, String clientBuilderId, boolean ignoreCertificateErrors, Integer connectionTimeout, Integer readTimeout, Integer retryCount, Integer retryInterval, String retryStatusCodes) {
         this(
             name,
             url,
@@ -68,19 +57,26 @@ public class GitLabConnection {
             getGitLabClientBuilderById(clientBuilderId),
             ignoreCertificateErrors,
             connectionTimeout,
-            readTimeout
+            readTimeout,
+            retryCount,
+            retryInterval,
+            retryStatusCodes
         );
     }
 
     @Restricted(NoExternalUse.class)
-    public GitLabConnection(String name, String url, String apiTokenId, GitLabClientBuilder clientBuilder, boolean ignoreCertificateErrors, Integer connectionTimeout, Integer readTimeout) {
+    @GeneratePojoBuilder(withFactoryMethod = "*")
+    public GitLabConnection(String name, String url, String apiTokenId, GitLabClientBuilder clientBuilder, boolean ignoreCertificateErrors, Integer connectionTimeout, Integer readTimeout, Integer retryCount, Integer retryInterval, String retryStatusCodes) {
         this.name = name;
         this.url = url;
         this.apiTokenId = apiTokenId;
         this.clientBuilder = clientBuilder;
         this.ignoreCertificateErrors = ignoreCertificateErrors;
-        this.connectionTimeout = connectionTimeout;
-        this.readTimeout = readTimeout;
+        this.connectionTimeout = connectionTimeout == null ? 10 : connectionTimeout;
+        this.readTimeout = readTimeout == null ? 10 : readTimeout;
+        this.retryCount = retryCount == null ? 0 : retryCount;
+        this.retryInterval = retryInterval == null ? 0 : retryInterval;
+        this.retryStatusCodes = retryStatusCodes;
     }
 
     public String getName() {
@@ -111,9 +107,21 @@ public class GitLabConnection {
         return readTimeout;
     }
 
+    public int getRetryInterval() {
+        return retryInterval;
+    }
+
+    public int getRetryCount() {
+        return retryCount;
+    }
+
+    public String getRetryStatusCodes() {
+        return retryStatusCodes;
+    }
+
     public GitLabClient getClient() {
         if (apiCache == null) {
-            apiCache = clientBuilder.buildClient(url, getApiToken(apiTokenId), ignoreCertificateErrors, connectionTimeout, readTimeout);
+            apiCache = clientBuilder.buildClient(this, getApiToken(apiTokenId));
         }
 
         return apiCache;
@@ -136,14 +144,38 @@ public class GitLabConnection {
 
 
     protected GitLabConnection readResolve() {
-        if (connectionTimeout == null || readTimeout == null) {
-            return new GitLabConnection(name, url, apiTokenId, new AutodetectGitLabClientBuilder(), ignoreCertificateErrors, 10, 10);
-        }
+        boolean replace = false;
+        GitLabClientBuilder clientBuilder = this.clientBuilder;
         if (clientBuilder == null) {
-            return new GitLabConnection(name, url, apiTokenId, new AutodetectGitLabClientBuilder(), ignoreCertificateErrors, connectionTimeout, readTimeout);
+            clientBuilder = new AutodetectGitLabClientBuilder();
+            replace = true;
+        }
+        Integer connectionTimeout = this.connectionTimeout;
+        if (connectionTimeout == null) {
+            connectionTimeout = 10;
+            replace = true;
+        }
+        Integer readTimeout = this.readTimeout;
+        if (readTimeout == null) {
+            readTimeout = 10;
+            replace = true;
+        }
+        Integer retryInterval = this.retryInterval;
+        if (retryInterval == null) {
+            retryInterval = 0;
+            replace = true;
+        }
+        Integer retryCount = this.retryCount;
+        if (retryCount == null) {
+            retryCount = 0;
+            replace = true;
         }
 
-        return this;
+        if (!replace) {
+            return this;
+        }
+
+        return new GitLabConnection(name, url, apiTokenId, clientBuilder, ignoreCertificateErrors, connectionTimeout, readTimeout, retryCount, retryInterval, retryStatusCodes);
     }
 
     @Initializer(after = InitMilestone.PLUGINS_STARTED)
@@ -163,4 +195,5 @@ public class GitLabConnection {
         }
         descriptor.save();
     }
+
 }

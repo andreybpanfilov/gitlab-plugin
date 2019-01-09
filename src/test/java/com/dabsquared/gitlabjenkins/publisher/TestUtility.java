@@ -6,7 +6,7 @@ import com.cloudbees.plugins.credentials.CredentialsScope;
 import com.cloudbees.plugins.credentials.CredentialsStore;
 import com.cloudbees.plugins.credentials.SystemCredentialsProvider;
 import com.cloudbees.plugins.credentials.domains.Domain;
-import com.dabsquared.gitlabjenkins.connection.GitLabConnection;
+import com.dabsquared.gitlabjenkins.connection.GitLabConnectionBuilder;
 import com.dabsquared.gitlabjenkins.connection.GitLabConnectionConfig;
 import com.dabsquared.gitlabjenkins.connection.GitLabConnectionProperty;
 import com.dabsquared.gitlabjenkins.gitlab.api.impl.V3GitLabClientBuilder;
@@ -40,6 +40,7 @@ import static org.mockito.Mockito.*;
 
 
 final class TestUtility {
+
     static final String GITLAB_CONNECTION_V3 = "GitLabV3";
     static final String GITLAB_CONNECTION_V4 = "GitLabV4";
     static final String BUILD_URL = "/build/123";
@@ -60,12 +61,23 @@ final class TestUtility {
                     new StringCredentialsImpl(CredentialsScope.SYSTEM, apiTokenId, "GitLab API Token", Secret.fromString(TestUtility.API_TOKEN)));
             }
         }
-        connectionConfig.addConnection(new GitLabConnection(TestUtility.GITLAB_CONNECTION_V3, "http://localhost:" + mockServer.getPort() + "/gitlab", apiTokenId, new V3GitLabClientBuilder(), false, 10, 10));
-        connectionConfig.addConnection(new GitLabConnection(TestUtility.GITLAB_CONNECTION_V4, "http://localhost:" + mockServer.getPort() + "/gitlab", apiTokenId, new V4GitLabClientBuilder(), false, 10, 10));
-
+        connectionConfig.addConnection(
+            GitLabConnectionBuilder.gitLabConnection()
+                .withName(TestUtility.GITLAB_CONNECTION_V3)
+                .withUrl("http://localhost:" + mockServer.getPort() + "/gitlab")
+                .withApiTokenId(apiTokenId)
+                .withClientBuilder(new V3GitLabClientBuilder())
+                .build());
+        connectionConfig.addConnection(
+            GitLabConnectionBuilder.gitLabConnection()
+                .withName(TestUtility.GITLAB_CONNECTION_V4)
+                .withUrl("http://localhost:" + mockServer.getPort() + "/gitlab")
+                .withApiTokenId(apiTokenId)
+                .withClientBuilder(new V4GitLabClientBuilder())
+                .build());
     }
 
-    static <T  extends Notifier & MatrixAggregatable> void verifyMatrixAggregatable(Class<T> publisherClass, BuildListener listener) throws InterruptedException, IOException {
+    static <T extends Notifier & MatrixAggregatable> void verifyMatrixAggregatable(Class<T> publisherClass, BuildListener listener) throws InterruptedException, IOException {
         AbstractBuild build = mock(AbstractBuild.class);
         AbstractProject project = mock(MatrixConfiguration.class);
         Notifier publisher = mock(publisherClass);
@@ -111,4 +123,5 @@ final class TestUtility {
     }
 
     private TestUtility() { /* contains only static utility-methods */ }
+
 }

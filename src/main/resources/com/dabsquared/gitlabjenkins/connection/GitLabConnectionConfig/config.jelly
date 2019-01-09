@@ -30,6 +30,15 @@
             <f:entry title="${%Read timeout} (${%in seconds})" field="readTimeout" description="${%The time to wait while receiving the response}">
               <f:textbox value="${connection.readTimeout}" default="10"/>
             </f:entry>
+            <f:entry title="${%Retry status codes}" field="retryStatusCodes" description="${%The list of retriable HTTP response status codes}">
+              <f:textbox value="${connection.retryStatusCodes}" default=""/>
+            </f:entry>
+            <f:entry title="${%Retry count}" field="retryCount" description="${%The amount of retries before giving up}">
+              <f:textbox value="${connection.retryCount}" default="0"/>
+            </f:entry>
+            <f:entry title="${%Retry interval} (${%in seconds})" field="retryInterval" description="${%The time to wait before retry http request}">
+              <f:textbox value="${connection.retryInterval}" default="0"/>
+            </f:entry>
             <st:include page="configure-advanced.jelly" optional="true" />
           </f:advanced>
           <f:validateButton title="${%Test Connection}" progress="${%Testing...}" method="testConnection"

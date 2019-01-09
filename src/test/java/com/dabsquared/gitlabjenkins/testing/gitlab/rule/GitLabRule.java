@@ -7,6 +7,7 @@ import com.cloudbees.plugins.credentials.CredentialsStore;
 import com.cloudbees.plugins.credentials.SystemCredentialsProvider;
 import com.cloudbees.plugins.credentials.domains.Domain;
 import com.dabsquared.gitlabjenkins.connection.GitLabConnection;
+import com.dabsquared.gitlabjenkins.connection.GitLabConnectionBuilder;
 import com.dabsquared.gitlabjenkins.connection.GitLabConnectionConfig;
 import com.dabsquared.gitlabjenkins.connection.GitLabConnectionProperty;
 import com.dabsquared.gitlabjenkins.gitlab.api.GitLabClient;
@@ -22,8 +23,6 @@ import org.junit.rules.TestRule;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
 
-import javax.ws.rs.client.ClientRequestContext;
-import javax.ws.rs.client.ClientRequestFilter;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -37,6 +36,7 @@ import java.util.UUID;
  * @author Robin Müller
  */
 public class GitLabRule implements TestRule {
+
     private static final String API_TOKEN_ID = "apiTokenId";
     private static final String PASSWORD = "integration-test";
 
@@ -88,7 +88,13 @@ public class GitLabRule implements TestRule {
         }
 
         GitLabConnectionConfig config = Jenkins.getInstance().getDescriptorByType(GitLabConnectionConfig.class);
-        GitLabConnection connection = new GitLabConnection("test", url, API_TOKEN_ID, new V3GitLabClientBuilder(), true,10, 10);
+        GitLabConnection connection = GitLabConnectionBuilder.gitLabConnection()
+            .withName("test")
+            .withUrl(url)
+            .withApiTokenId(API_TOKEN_ID)
+            .withClientBuilder(new V3GitLabClientBuilder())
+            .withIgnoreCertificateErrors(true)
+            .build();
         config.addConnection(connection);
         config.save();
         return new GitLabConnectionProperty(connection.getName());
@@ -145,6 +151,7 @@ public class GitLabRule implements TestRule {
     }
 
     private class GitlabStatement extends Statement {
+
         private final Statement next;
 
         private GitlabStatement(Statement next) {
@@ -159,5 +166,7 @@ public class GitLabRule implements TestRule {
                 GitLabRule.this.cleanup();
             }
         }
+
     }
+
 }
