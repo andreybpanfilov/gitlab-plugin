@@ -38,6 +38,8 @@ public interface GitLabClient {
 
     List<MergeRequest> getMergeRequests(String projectId, State state, int page, int perPage);
 
+    MergeRequest getMergeRequest(MergeRequest mr);
+
     List<Branch> getBranches(String projectId);
 
     Branch getBranch(String projectId, String branch);

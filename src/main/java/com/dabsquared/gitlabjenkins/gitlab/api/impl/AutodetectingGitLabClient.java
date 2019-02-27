@@ -216,6 +216,17 @@ final class AutodetectingGitLabClient implements GitLabClient {
     }
 
     @Override
+    public MergeRequest getMergeRequest(final MergeRequest mr) {
+        return execute(
+            new GitLabOperation<MergeRequest>() {
+                @Override
+                MergeRequest execute(GitLabClient client) {
+                    return client.getMergeRequest(mr);
+                }
+            });
+    }
+
+    @Override
     public List<Branch> getBranches(final String projectId) {
         return execute(
             new GitLabOperation<List<Branch>>() {

@@ -4,6 +4,7 @@ import net.karneim.pojobuilder.GeneratePojoBuilder;
 import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.HashCodeBuilder;
 import org.apache.commons.lang.builder.ToStringBuilder;
+import org.jenkinsci.plugins.scriptsecurity.sandbox.whitelists.Whitelisted;
 
 /**
  * @author Robin Müller
@@ -16,6 +17,7 @@ public class User {
     private String username;
     private String email;
 
+    @Whitelisted
     public Integer getId() {
         return id;
     }
@@ -24,6 +26,7 @@ public class User {
         this.id = id;
     }
 
+    @Whitelisted
     public String getName() {
         return name;
     }
@@ -32,6 +35,7 @@ public class User {
         this.name = name;
     }
 
+    @Whitelisted
     public String getUsername() {
         return username;
     }
@@ -40,6 +44,7 @@ public class User {
         this.username = username;
     }
 
+    @Whitelisted
     public String getEmail() {
         return email;
     }

@@ -38,6 +38,8 @@ interface GitLabApiProxy {
 
     List<MergeRequest> getMergeRequests(String projectId, State state, int page, int perPage);
 
+    MergeRequest getMergeRequest(Integer projectId, Integer mergeRequestId);
+
     List<Branch> getBranches(String projectId);
 
     Branch getBranch(String projectId, String branch);

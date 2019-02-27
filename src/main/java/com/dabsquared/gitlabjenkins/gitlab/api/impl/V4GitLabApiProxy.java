@@ -166,6 +166,13 @@ interface V4GitLabApiProxy extends GitLabApiProxy {
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
+    @Path("/projects/{projectId}/merge_requests/{mergeRequestIid}")
+    @Override
+    MergeRequest getMergeRequest(@PathParam("projectId") Integer projectId,
+                                 @PathParam("mergeRequestIid") Integer mergeRequestIid);
+
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
     @Path("/projects/{projectId}/repository/branches")
     @Override
     List<Branch> getBranches(@PathParam("projectId") String projectId);

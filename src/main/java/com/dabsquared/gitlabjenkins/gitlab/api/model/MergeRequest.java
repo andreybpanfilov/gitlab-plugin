@@ -5,6 +5,7 @@ import net.karneim.pojobuilder.GeneratePojoBuilder;
 import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.HashCodeBuilder;
 import org.apache.commons.lang.builder.ToStringBuilder;
+import org.jenkinsci.plugins.scriptsecurity.sandbox.whitelists.Whitelisted;
 import org.kohsuke.stapler.export.Exported;
 import org.kohsuke.stapler.export.ExportedBean;
 
@@ -52,6 +53,7 @@ public class MergeRequest {
     }
 
     @Exported
+    @Whitelisted
     public Integer getId() {
         return id;
     }
@@ -61,6 +63,7 @@ public class MergeRequest {
     }
 
     @Exported
+    @Whitelisted
     public Integer getIid() {
         return iid;
     }
@@ -70,6 +73,7 @@ public class MergeRequest {
     }
 
     @Exported
+    @Whitelisted
     public String getSourceBranch() {
         return sourceBranch;
     }
@@ -79,6 +83,7 @@ public class MergeRequest {
     }
 
     @Exported
+    @Whitelisted
     public String getTargetBranch() {
         return targetBranch;
     }
@@ -88,6 +93,7 @@ public class MergeRequest {
     }
 
     @Exported
+    @Whitelisted
     public Integer getProjectId() {
         return projectId;
     }
@@ -97,6 +103,7 @@ public class MergeRequest {
     }
 
     @Exported
+    @Whitelisted
     public String getTitle() {
         return title;
     }
@@ -106,6 +113,7 @@ public class MergeRequest {
     }
 
     @Exported
+    @Whitelisted
     public State getState() {
         return state;
     }
@@ -115,6 +123,7 @@ public class MergeRequest {
     }
 
     @Exported
+    @Whitelisted
     public Integer getUpvotes() {
         return upvotes;
     }
@@ -124,6 +133,7 @@ public class MergeRequest {
     }
 
     @Exported
+    @Whitelisted
     public Integer getDownvotes() {
         return downvotes;
     }
@@ -133,6 +143,7 @@ public class MergeRequest {
     }
 
     @Exported
+    @Whitelisted
     public User getAuthor() {
         return author;
     }
@@ -142,6 +153,7 @@ public class MergeRequest {
     }
 
     @Exported
+    @Whitelisted
     public User getAssignee() {
         return assignee;
     }
@@ -151,6 +163,7 @@ public class MergeRequest {
     }
 
     @Exported
+    @Whitelisted
     public Integer getSourceProjectId() {
         return sourceProjectId;
     }
@@ -160,6 +173,7 @@ public class MergeRequest {
     }
 
     @Exported
+    @Whitelisted
     public Integer getTargetProjectId() {
         return targetProjectId;
     }
@@ -169,6 +183,7 @@ public class MergeRequest {
     }
 
     @Exported
+    @Whitelisted
     public List<String> getLabels() {
         return labels;
     }
@@ -178,6 +193,7 @@ public class MergeRequest {
     }
 
     @Exported
+    @Whitelisted
     public String getDescription() {
         return description;
     }
@@ -187,6 +203,7 @@ public class MergeRequest {
     }
 
     @Exported
+    @Whitelisted
     public Boolean getWorkInProgress() {
         return workInProgress;
     }
@@ -196,6 +213,7 @@ public class MergeRequest {
     }
 
     @Exported
+    @Whitelisted
     public Boolean getMergeWhenBuildSucceeds() {
         return mergeWhenBuildSucceeds;
     }
@@ -205,6 +223,7 @@ public class MergeRequest {
     }
 
     @Exported
+    @Whitelisted
     public String getMergeStatus() {
         return mergeStatus;
     }

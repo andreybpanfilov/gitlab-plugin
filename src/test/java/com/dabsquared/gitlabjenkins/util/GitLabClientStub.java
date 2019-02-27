@@ -94,6 +94,11 @@ class GitLabClientStub implements GitLabClient {
     }
 
     @Override
+    public MergeRequest getMergeRequest(MergeRequest mr) {
+        return mr;
+    }
+
+    @Override
     public List<Branch> getBranches(String projectId) {
         return null;
     }

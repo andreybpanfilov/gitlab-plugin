@@ -101,6 +101,11 @@ final class ResteasyGitLabClient implements GitLabClient {
     }
 
     @Override
+    public MergeRequest getMergeRequest(MergeRequest mr) {
+        return api.getMergeRequest(mr.getProjectId(), mergeRequestIdProvider.apply(mr));
+    }
+
+    @Override
     public List<Branch> getBranches(String projectId) {
         return api.getBranches(projectId);
     }
